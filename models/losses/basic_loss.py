@@ -28,7 +28,7 @@ class BalanceCrossEntropyLoss(nn.Module):
         self.negative_ratio = negative_ratio
         self.eps = eps
 
-    def forward(self, pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor, return_origin=False):
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor):
         """
         Args:
             pred: shape :math:`(N, 1, H, W)`, the prediction of network
@@ -42,13 +42,9 @@ class BalanceCrossEntropyLoss(nn.Module):
         loss = nn.functional.binary_cross_entropy(pred, gt, reduction='none')
         positive_loss = loss * positive.float()
         negative_loss = loss * negative.float()
-        # negative_loss, _ = torch.topk(negative_loss.view(-1).contiguous(), negative_count)
         negative_loss, _ = negative_loss.view(-1).topk(negative_count)
 
         balance_loss = (positive_loss.sum() + negative_loss.sum()) / (positive_count + negative_count + self.eps)
-
-        if return_origin:
-            return balance_loss, loss
         return balance_loss
 
 
@@ -63,24 +59,21 @@ class DiceLoss(nn.Module):
         super(DiceLoss, self).__init__()
         self.eps = eps
 
-    def forward(self, pred: torch.Tensor, gt, mask, weights=None):
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor):
         """
         pred: one or two heatmaps of shape (N, 1, H, W),
             the losses of tow heatmaps are added together.
         gt: (N, 1, H, W)
         mask: (N, H, W)
         """
-        return self._compute(pred, gt, mask, weights)
+        return self._compute(pred, gt, mask)
 
-    def _compute(self, pred, gt, mask, weights):
+    def _compute(self, pred, gt, mask):
         if pred.dim() == 4:
             pred = pred[:, 0, :, :]
             gt = gt[:, 0, :, :]
         assert pred.shape == gt.shape
         assert pred.shape == mask.shape
-        if weights is not None:
-            assert weights.shape == mask.shape
-            mask = weights * mask
         intersection = (pred * gt * mask).sum()
 
         union = (pred * mask).sum() + (gt * mask).sum() + self.eps
@@ -95,6 +88,6 @@ class MaskL1Loss(nn.Module):
         super(MaskL1Loss, self).__init__()
         self.eps = eps
 
-    def forward(self, pred: torch.Tensor, gt, mask):
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor):
         loss = (torch.abs(pred - gt) * mask).sum() / (mask.sum() + self.eps)
         return loss
