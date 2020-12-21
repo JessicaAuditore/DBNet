@@ -1,9 +1,11 @@
+from typing import Any
+
 import torch
 import torch.nn as nn
 
 
 class BalanceCrossEntropyLoss(nn.Module):
-    '''
+    """
     Balanced cross entropy loss.
     Shape:
         - Input: :math:`(N, 1, H, W)`
@@ -19,24 +21,20 @@ class BalanceCrossEntropyLoss(nn.Module):
         >>> target = torch.empty(3).random_(2)
         >>> output = loss(m(input), target)
         >>> output.backward()
-    '''
+    """
 
     def __init__(self, negative_ratio=3.0, eps=1e-6):
         super(BalanceCrossEntropyLoss, self).__init__()
         self.negative_ratio = negative_ratio
         self.eps = eps
 
-    def forward(self,
-                pred: torch.Tensor,
-                gt: torch.Tensor,
-                mask: torch.Tensor,
-                return_origin=False):
-        '''
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor, return_origin=False):
+        """
         Args:
             pred: shape :math:`(N, 1, H, W)`, the prediction of network
             gt: shape :math:`(N, 1, H, W)`, the target
             mask: shape :math:`(N, H, W)`, the mask indicates positive regions
-        '''
+        """
         positive = (gt * mask).byte()
         negative = ((1 - gt) * mask).byte()
         positive_count = int(positive.float().sum())
@@ -55,23 +53,23 @@ class BalanceCrossEntropyLoss(nn.Module):
 
 
 class DiceLoss(nn.Module):
-    '''
+    """
     Loss function from https://arxiv.org/abs/1707.03237,
     where iou computation is introduced heatmap manner to measure the
     diversity bwtween tow heatmaps.
-    '''
+    """
 
     def __init__(self, eps=1e-6):
         super(DiceLoss, self).__init__()
         self.eps = eps
 
     def forward(self, pred: torch.Tensor, gt, mask, weights=None):
-        '''
+        """
         pred: one or two heatmaps of shape (N, 1, H, W),
             the losses of tow heatmaps are added together.
         gt: (N, 1, H, W)
         mask: (N, H, W)
-        '''
+        """
         return self._compute(pred, gt, mask, weights)
 
     def _compute(self, pred, gt, mask, weights):
@@ -92,6 +90,7 @@ class DiceLoss(nn.Module):
 
 
 class MaskL1Loss(nn.Module):
+
     def __init__(self, eps=1e-6):
         super(MaskL1Loss, self).__init__()
         self.eps = eps
