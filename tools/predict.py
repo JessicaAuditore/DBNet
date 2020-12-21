@@ -1,13 +1,4 @@
 import os
-import sys
-import pathlib
-
-__dir__ = pathlib.Path(os.path.abspath(__file__))
-sys.path.append(str(__dir__))
-sys.path.append(str(__dir__.parent.parent))
-
-# project = 'DBNet.pytorch'  # 工作项目根目录
-# sys.path.append(os.getcwd().split(project)[0] + project)
 import time
 import cv2
 import torch
@@ -65,7 +56,7 @@ class Pytorch_model:
                 self.transform.append(t)
         self.transform = get_transforms(self.transform)
 
-    def predict(self, img_path: str, is_output_polygon=False, short_size: int = 1024):
+    def predict(self, img_path: str, is_output_polygon=True, short_size: int = 1024):
         '''
         对传入的图像进行预测，支持图像地址,opencv 读取图片，偏慢
         :param img_path: 图像地址
@@ -115,7 +106,9 @@ def save_depoly(model, input, save_path):
 def init_args():
     import argparse
     parser = argparse.ArgumentParser(description='DBNet')
-    parser.add_argument('--model_path', default=r'../pth/model.pth', type=str)
+    parser.add_argument('--model_path',
+                        default=r'C:/Users/94806/Desktop/output/recall_0.523881_precision_0.739726_hmean_0.613368.pth',
+                        type=str)
     parser.add_argument('--input_folder', default='../test/input', type=str, help='img path for predict')
     parser.add_argument('--output_folder', default='../test/output', type=str, help='img path for output')
     parser.add_argument('--thre', default=0.3, type=float, help='the thresh of post_processing')
@@ -134,11 +127,9 @@ if __name__ == '__main__':
 
     args = init_args()
     print(args)
-    os.environ['CUDA_VISIBLE_DEVICES'] = str('0')
-    # 初始化网络
+
     model = Pytorch_model(args.model_path, post_p_thre=args.thre, gpu_id=0)
-    img_folder = pathlib.Path(args.input_folder)
-    for img_path in tqdm(get_file_list(args.input_folder, p_postfix=['.png'])):
+    for img_path in tqdm(get_file_list(args.input_folder, p_postfix=['.jpg'])):
         preds, boxes_list, score_list, t = model.predict(img_path, is_output_polygon=args.polygon)
         img = draw_bbox(cv2.imread(img_path)[:, :, ::-1], boxes_list)
         if args.show:
