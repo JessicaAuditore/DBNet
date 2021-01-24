@@ -5,6 +5,13 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 def main():
+    import sys
+    import pathlib
+
+    __dir__ = pathlib.Path(os.path.abspath(__file__))
+    sys.path.append(str(__dir__))
+    sys.path.append(str(__dir__.parent.parent))
+
     from models import build_model, build_loss
     from data_loader import get_dataloader
     from utils import Trainer
