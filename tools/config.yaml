@@ -2,7 +2,7 @@ name: DBNet
 arch:
   type: Model
   backbone:
-    type: resnet18
+    type: resnet34
     pretrained: true
     in_channels: 3
   neck:
@@ -43,7 +43,7 @@ trainer:
   epochs: 200
   log_iter: 1
   show_images_iter: 1
-  resume_checkpoint: 'C:/Users/94806/Desktop/output/recall_0.523881_precision_0.739726_hmean_0.613368.pth'
+  resume_checkpoint: ''
   output_dir: output
 dataset:
   train:
@@ -70,7 +70,7 @@ dataset:
               shrink_ratio: 0.4
               min_text_size: 8
         data_path:
-          - D:\develop\dataset\ICDAR2017RCTW\train.json
+          - /home/ustc1/DBNet/dataset/train.json
         transforms:
           - type: ToTensor
             args: {}
@@ -84,16 +84,16 @@ dataset:
         filter_keys: [ img_path,img_name,text_polys,texts,ignore_tags,shape ] # 返回数据之前，从数据字典里删除的key
         ignore_tags: [ '*', '###' ]
     loader:
-      batch_size: 10
+      batch_size: 12
       shuffle: true
       pin_memory: true
-      num_workers: 8
+      num_workers: 16
       collate_fn: ''
   validate:
     dataset:
       args:
         data_path:
-          - D:\develop\dataset\ICDAR2017RCTW\test.json
+          - /home/ustc1/DBNet/dataset/test.json
         transforms:
           - type: ToTensor
             args: { }
@@ -115,5 +115,5 @@ dataset:
       batch_size: 1
       shuffle: true
       pin_memory: false
-      num_workers: 8
+      num_workers: 16
       collate_fn: ICDARCollectFN

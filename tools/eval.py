@@ -66,7 +66,7 @@ class EVAL():
 
 def init_args():
     parser = argparse.ArgumentParser(description='DBNet')
-    parser.add_argument('--model_path', required=False, default='C:/Users/94806/Desktop/output/a.pth', type=str)
+    parser.add_argument('--model_path', required=False, default='../output/checkpoint/model_latest.pth', type=str)
     args = parser.parse_args()
     return args
 

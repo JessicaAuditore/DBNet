@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 import os
 import pathlib
-import shutil
+import glob
 from pprint import pformat
 
 from utils import WarmupPolyLR, setup_logger, cal_text_score, runningScore
@@ -18,8 +18,8 @@ class Trainer:
         self.save_dir = config['trainer']['output_dir']
         self.checkpoint_dir = os.path.join(self.save_dir, 'checkpoint')
 
-        if config['trainer']['resume_checkpoint'] == '':
-            shutil.rmtree(self.save_dir, ignore_errors=True)
+        # if config['trainer']['resume_checkpoint'] == '':
+        #     shutil.rmtree(self.save_dir, ignore_errors=True)
         if not os.path.exists(self.checkpoint_dir):
             os.makedirs(self.checkpoint_dir)
 
@@ -28,6 +28,7 @@ class Trainer:
         self.config = config
         self.model = model
         self.criterion = criterion
+
         # logger
         self.epochs = self.config['trainer']['epochs']
         self.log_iter = self.config['trainer']['log_iter']
@@ -47,17 +48,30 @@ class Trainer:
             self.with_cuda = False
             self.device = torch.device("cpu")
         self.logger_info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
-        # metrics
-        self.metrics = {'recall': 0, 'precision': 0, 'hmean': 0, 'train_loss': float('inf'), 'best_model_epoch': 0}
 
+        # metrics and optimizer
+        self.metrics = {'recall': 0, 'precision': 0, 'hmean': 0, 'train_loss': float('inf'), 'best_model_epoch': 0}
         self.optimizer = self._initialize('optimizer', torch.optim, model.parameters())
 
+        # checkpoint
         if self.config['trainer']['resume_checkpoint'] != '':
-            self._load_checkpoint(self.config['trainer']['resume_checkpoint'])
+            self._load_checkpoint(self.config['trainer']['resume_checkpoint'], False)
+            self.net_save_path_best = ''
+        else:
+            net_save_path_latest = os.path.join(self.checkpoint_dir, "model_latest.pth")
+            if os.path.isfile(net_save_path_latest):
+                self._load_checkpoint(net_save_path_latest, False)
+
+            self.net_save_path_best = os.path.join(self.checkpoint_dir, "model_best*.pth")
+            if glob.glob(self.net_save_path_best):
+                self.net_save_path_best = glob.glob(self.net_save_path_best)[0]
+                self._load_checkpoint(self.net_save_path_best, True)
+            else:
+                self.net_save_path_best = ''
 
         self.model.to(self.device)
 
-        # make inverse Normalize
+        # normalize
         self.UN_Normalize = False
         for t in self.config['dataset']['train']['dataset']['args']['transforms']:
             if t['type'] == 'Normalize':
@@ -74,7 +88,7 @@ class Trainer:
         self.metric_cls = metric_cls
         self.train_loader_len = len(train_loader)
 
-        # 初始化学习率调整器
+        # lr_scheduler
         warmup_iters = config['lr_scheduler']['args']['warmup_epoch'] * self.train_loader_len
         if self.start_epoch > 1:
             self.config['lr_scheduler']['args']['last_epoch'] = (self.start_epoch - 1) * self.train_loader_len
@@ -87,7 +101,6 @@ class Trainer:
                 len(self.validate_loader)))
 
         self.epoch_result = {'train_loss': 0, 'lr': 0, 'time': 0, 'epoch': 0}
-        self.net_save_path_best = ''
 
     def train(self):
         # Full training logic
@@ -123,6 +136,7 @@ class Trainer:
             self.optimizer.zero_grad()
             loss_dict['loss'].backward()
             self.optimizer.step()
+            self.scheduler.step()
 
             # acc iou
             score_shrink_map = cal_text_score(preds[:, 0, :, :], batch['shrink_map'], batch['shrink_mask'],
@@ -146,13 +160,11 @@ class Trainer:
             if self.global_step % self.log_iter == 0:
                 batch_time = time.time() - batch_start
                 self.logger_info(
-                    '[{}/{}], [{}/{}], global_step: {}, speed: {:.1f} samples/sec, acc: {:.4f}, iou_shrink_map: {:.4f}, {}, lr:{:.6}, time:{:.2f}'.format(
+                    '[{}/{}], [{}/{}], global_step: {}, speed: {:.1f} samples/sec, acc: {:.4f}, iou_shrink_map: {:.4f}, {}lr:{:.6}, time:{:.2f}'.format(
                         epoch, self.epochs, i + 1, self.train_loader_len, self.global_step,
-                                            self.log_iter * cur_batch_size / batch_time, acc,
-                        iou_shrink_map, loss_str, lr, batch_time))
+                                            self.log_iter * cur_batch_size / batch_time, acc, iou_shrink_map, loss_str,
+                        lr, batch_time))
                 batch_start = time.time()
-
-        self.scheduler.step()
 
         return {'train_loss': train_loss / self.train_loader_len, 'lr': lr, 'time': time.time() - epoch_start,
                 'epoch': epoch}
@@ -172,7 +184,7 @@ class Trainer:
                             batch[key] = value.to(self.device)
                 start = time.time()
                 preds = self.model(batch['img'])
-                boxes, scores = self.post_process(batch, preds,is_output_polygon=self.metric_cls.is_output_polygon)
+                boxes, scores = self.post_process(batch, preds, is_output_polygon=self.metric_cls.is_output_polygon)
                 total_frame += batch['img'].size()[0]
                 total_time += time.time() - start
                 raw_metric = self.metric_cls.validate_measure(batch, (boxes, scores))
@@ -191,7 +203,6 @@ class Trainer:
         self._save_checkpoint(self.epoch_result['epoch'], net_save_path_latest)
 
         recall, precision, hmean = self._eval()
-        # self.logger_info('test: recall: {:.6f}, precision: {:.6f}, hmean: {:.6f}'.format(recall, precision, hmean))
         self.logger_info('test: recall: {}, precision: {}, hmean: {}'.format(recall, precision, hmean))
 
         if hmean > self.metrics['hmean']:
@@ -223,13 +234,6 @@ class Trainer:
         self.logger_info('finish train')
 
     def _save_checkpoint(self, epoch, file_name):
-        """
-        Saving checkpoints
-
-        :param epoch: current epoch number
-        :param log: logging information of the epoch
-        :param save_best: if True, rename the saved checkpoint to 'model_best.pth.tar'
-        """
         state_dict = self.model.state_dict()
         state = {
             'epoch': epoch,
@@ -243,13 +247,15 @@ class Trainer:
         filename = os.path.join(self.checkpoint_dir, file_name)
         torch.save(state, filename)
 
-    def _load_checkpoint(self, checkpoint_path):
-        """
-        Resume from saved checkpoints
-        :param checkpoint_path: Checkpoint path to be resumed
-        """
+    def _load_checkpoint(self, checkpoint_path, is_best):
         self.logger_info("Loading checkpoint: {} ...".format(checkpoint_path))
         checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
+
+        if is_best:
+            self.metrics = checkpoint['metrics']
+            self.logger_info("metrics resume from checkpoint {}".format(checkpoint_path))
+            return
+
         self.model.load_state_dict(checkpoint['state_dict'])
         self.global_step = checkpoint['global_step']
         self.start_epoch = checkpoint['epoch']
