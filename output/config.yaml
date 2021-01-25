@@ -2,7 +2,7 @@ name: DBNet
 arch:
   type: Model
   backbone:
-    type: resnet18
+    type: resnet34
     pretrained: true
     in_channels: 3
   neck:
@@ -39,11 +39,12 @@ lr_scheduler:
   args:
     warmup_epoch: 3
 trainer:
+  cuda: cuda:1
   seed: 2
   epochs: 200
   log_iter: 1
   show_images_iter: 1
-  resume_checkpoint: C:/Users/94806/Desktop/output/recall_0.523881_precision_0.739726_hmean_0.613368.pth
+  resume_checkpoint: C:\Users\94806\Desktop\output\model.pth
   output_dir: C:\Users\94806\Desktop\code\DBNet\output
 dataset:
   train:
@@ -82,7 +83,7 @@ dataset:
             shrink_ratio: 0.4
             min_text_size: 8
         data_path:
-        - D:\develop\dataset\ICDAR2017RCTW\train.json
+        - D:/develop/dataset/ICDAR2017RCTW/train.json
         transforms:
         - type: ToTensor
           args: {}
@@ -110,16 +111,16 @@ dataset:
         - '*'
         - '###'
     loader:
-      batch_size: 10
+      batch_size: 12
       shuffle: true
       pin_memory: true
-      num_workers: 8
+      num_workers: 16
       collate_fn: ''
   validate:
     dataset:
       args:
         data_path:
-        - D:\develop\dataset\ICDAR2017RCTW\test.json
+        - D:/develop/dataset/ICDAR2017RCTW/test.json
         transforms:
         - type: ToTensor
           args: {}
@@ -149,5 +150,5 @@ dataset:
       batch_size: 1
       shuffle: true
       pin_memory: false
-      num_workers: 8
+      num_workers: 16
       collate_fn: ICDARCollectFN

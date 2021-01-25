@@ -18,8 +18,6 @@ class Trainer:
         self.save_dir = config['trainer']['output_dir']
         self.checkpoint_dir = os.path.join(self.save_dir, 'checkpoint')
 
-        # if config['trainer']['resume_checkpoint'] == '':
-        #     shutil.rmtree(self.save_dir, ignore_errors=True)
         if not os.path.exists(self.checkpoint_dir):
             os.makedirs(self.checkpoint_dir)
 
@@ -42,7 +40,7 @@ class Trainer:
         if torch.cuda.is_available():
             self.with_cuda = True
             torch.backends.cudnn.benchmark = True
-            self.device = torch.device("cuda")
+            self.device = torch.device(self.config['trainer']['cuda'])
             torch.cuda.manual_seed(self.config['trainer']['seed'])  # 为当前GPU设置随机种子
         else:
             self.with_cuda = False
@@ -103,7 +101,6 @@ class Trainer:
         self.epoch_result = {'train_loss': 0, 'lr': 0, 'time': 0, 'epoch': 0}
 
     def train(self):
-        # Full training logic
         for epoch in range(self.start_epoch + 1, self.epochs + 1):
             self.epoch_result = self._train_epoch(epoch)
             self._on_epoch_finish()
