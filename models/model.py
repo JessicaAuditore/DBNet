@@ -9,10 +9,6 @@ from models.head import build_head
 
 class Model(nn.Module):
     def __init__(self, model_config: dict):
-        """
-        PANnet
-        :param model_config: 模型配置
-        """
         super().__init__()
         model_config = Dict(model_config)
         backbone_type = model_config.backbone.pop('type')
@@ -34,7 +30,6 @@ class Model(nn.Module):
 
 if __name__ == '__main__':
     import torch
-    import torchsummary
 
     device = torch.device('cpu')
     x = torch.zeros(2, 3, 640, 640).to(device)

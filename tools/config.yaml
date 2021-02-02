@@ -2,7 +2,7 @@ name: DBNet
 arch:
   type: Model
   backbone:
-    type: resnet34
+    type: resnet50
     pretrained: true
     in_channels: 3
   neck:
@@ -39,6 +39,7 @@ lr_scheduler:
   args:
     warmup_epoch: 3
 trainer:
+  CUDA_VISIBLE_DEVICES: 0
   seed: 2
   epochs: 200
   log_iter: 1
@@ -49,8 +50,8 @@ dataset:
   train:
     dataset:
       args:
-        pre_processes: # 数据的预处理过程，包含augment和标签制作
-          - type: IaaAugment # 使用imgaug进行变换
+        pre_processes:
+          - type: IaaAugment
             args:
               - { 'type': Fliplr, 'args': { 'p': 0.5 } }
               - { 'type': Affine, 'args': { 'rotate': [ -10,10 ] } }
@@ -70,7 +71,7 @@ dataset:
               shrink_ratio: 0.4
               min_text_size: 8
         data_path:
-          - /home/ustc1/DBNet/dataset/train.json
+          - D:/develop/dataset/ICDAR2017RCTW/train.json
         transforms:
           - type: ToTensor
             args: {}
@@ -84,16 +85,16 @@ dataset:
         filter_keys: [ img_path,img_name,text_polys,texts,ignore_tags,shape ] # 返回数据之前，从数据字典里删除的key
         ignore_tags: [ '*', '###' ]
     loader:
-      batch_size: 12
+      batch_size: 21
       shuffle: true
       pin_memory: true
-      num_workers: 16
+      num_workers: 2
       collate_fn: ''
   validate:
     dataset:
       args:
         data_path:
-          - /home/ustc1/DBNet/dataset/test.json
+          - D:/develop/dataset/ICDAR2017RCTW/test.json
         transforms:
           - type: ToTensor
             args: { }
@@ -115,5 +116,5 @@ dataset:
       batch_size: 1
       shuffle: true
       pin_memory: false
-      num_workers: 16
+      num_workers: 4
       collate_fn: ICDARCollectFN

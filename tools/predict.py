@@ -102,7 +102,7 @@ def init_args():
     import argparse
     parser = argparse.ArgumentParser(description='DBNet')
     parser.add_argument('--model_path',
-                        default=r'C:/Users/94806/Desktop/model_best_recall_0.558953_precision_0.769060_hmean_0.647386.pth',
+                        default=r'C:\Users\94806\Desktop\output\model_best_recall_0.612750_precision_0.778183_hmean_0.685628.pth',
                         type=str)
     parser.add_argument('--input_folder', default='../test/input', type=str, help='img path for predict')
     parser.add_argument('--output_folder', default='../test/output', type=str, help='img path for output')
@@ -170,11 +170,16 @@ if __name__ == '__main__':
     args = init_args()
     print(args)
 
-    # model = Pytorch_model(args.model_path, post_p_thre=args.thre, gpu_id=0)
-    model = torch.jit.load("dbnet.pt").cuda()
+    model = Pytorch_model(args.model_path, post_p_thre=args.thre, gpu_id=0)
+
+    # input = torch.rand(1, 3, 736, 736).cuda()
+    # save_depoly(model.model.eval(), input, "dbnet.pt")
+    #
+    # torch.save(model, './model.pth')
+    # model = torch.jit.load("dbnet.pt").cuda()
 
     for img_path in tqdm(get_file_list(args.input_folder, p_postfix=['.jpg'])):
-        preds, boxes_list, score_list, t = predict(model, img_path, is_output_polygon=False)
+        preds, boxes_list, score_list, t = model.predict(img_path, is_output_polygon=False)
         img = draw_bbox(cv2.imread(img_path)[:, :, ::-1], boxes_list)
         # if args.show:
         #     show_img(preds)

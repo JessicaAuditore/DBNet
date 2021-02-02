@@ -2,7 +2,7 @@ name: DBNet
 arch:
   type: Model
   backbone:
-    type: resnet34
+    type: resnet50
     pretrained: true
     in_channels: 3
   neck:
@@ -39,12 +39,12 @@ lr_scheduler:
   args:
     warmup_epoch: 3
 trainer:
-  cuda: cuda:1
+  CUDA_VISIBLE_DEVICES: null
   seed: 2
   epochs: 200
   log_iter: 1
   show_images_iter: 1
-  resume_checkpoint: C:\Users\94806\Desktop\output\model.pth
+  resume_checkpoint: ''
   output_dir: C:\Users\94806\Desktop\code\DBNet\output
 dataset:
   train:
@@ -111,10 +111,10 @@ dataset:
         - '*'
         - '###'
     loader:
-      batch_size: 12
+      batch_size: 21
       shuffle: true
       pin_memory: true
-      num_workers: 16
+      num_workers: 2
       collate_fn: ''
   validate:
     dataset:
@@ -150,5 +150,5 @@ dataset:
       batch_size: 1
       shuffle: true
       pin_memory: false
-      num_workers: 16
+      num_workers: 4
       collate_fn: ICDARCollectFN

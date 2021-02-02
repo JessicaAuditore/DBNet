@@ -36,15 +36,21 @@ class Trainer:
         self.logger_info(pformat(self.config))
 
         # device
-        torch.manual_seed(self.config['trainer']['seed'])  # 为CPU设置随机种子
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and self.config['trainer']['CUDA_VISIBLE_DEVICES'] is not None:
             self.with_cuda = True
             torch.backends.cudnn.benchmark = True
-            self.device = torch.device(self.config['trainer']['cuda'])
-            torch.cuda.manual_seed(self.config['trainer']['seed'])  # 为当前GPU设置随机种子
+            if str(self.config['trainer']['CUDA_VISIBLE_DEVICES']).find(',') != -1:
+                self.is_distributed = True
+                os.environ.setdefault("CUDA_VISIBLE_DEVICES", self.config['trainer']['CUDA_VISIBLE_DEVICES'])
+                torch.cuda.manual_seed_all(self.config['trainer']['seed'])
+            else:
+                self.is_distributed = False
+                torch.cuda.manual_seed(self.config['trainer']['seed'])
+            self.device = torch.device('cuda')
         else:
             self.with_cuda = False
             self.device = torch.device("cpu")
+            torch.manual_seed(self.config['trainer']['seed'])
         self.logger_info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
 
         # metrics and optimizer
@@ -67,6 +73,8 @@ class Trainer:
             else:
                 self.net_save_path_best = ''
 
+        if self.with_cuda and self.is_distributed:
+            self.model = torch.nn.DataParallel(self.model)
         self.model.to(self.device)
 
         # normalize
@@ -168,7 +176,7 @@ class Trainer:
 
     def _eval(self):
         self.model.eval()
-        torch.cuda.empty_cache()  # speed up evaluating after training finished
+        torch.cuda.empty_cache()
         raw_metrics = []
         total_frame = 0.0
         total_time = 0.0
