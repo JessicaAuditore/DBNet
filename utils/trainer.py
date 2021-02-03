@@ -36,22 +36,33 @@ class Trainer:
         self.logger_info(pformat(self.config))
 
         # device
-        if torch.cuda.is_available() and self.config['trainer']['CUDA_VISIBLE_DEVICES'] is not None:
-            self.with_cuda = True
-            torch.backends.cudnn.benchmark = True
-            if str(self.config['trainer']['CUDA_VISIBLE_DEVICES']).find(',') != -1:
-                self.is_distributed = True
-                os.environ.setdefault("CUDA_VISIBLE_DEVICES", self.config['trainer']['CUDA_VISIBLE_DEVICES'])
-                torch.cuda.manual_seed_all(self.config['trainer']['seed'])
+        if self.config['trainer']['CUDA_VISIBLE_DEVICES'] is not None:
+            os.environ.setdefault("CUDA_VISIBLE_DEVICES", str(self.config['trainer']['CUDA_VISIBLE_DEVICES']))
+            if torch.cuda.is_available():
+                self.with_cuda = True
+                torch.backends.cudnn.benchmark = True
+                self.device = torch.device('cuda')
+                if torch.cuda.device_count() > 1:
+                    self.is_distributed = True
+                    torch.cuda.manual_seed_all(self.config['trainer']['seed'])
+                    self.model = torch.nn.DataParallel(self.model)
+                else:
+                    self.is_distributed = False
+                    torch.cuda.manual_seed(self.config['trainer']['seed'])
             else:
                 self.is_distributed = False
-                torch.cuda.manual_seed(self.config['trainer']['seed'])
-            self.device = torch.device('cuda')
+                self.with_cuda = False
+                self.device = torch.device("cpu")
+                torch.manual_seed(self.config['trainer']['seed'])
         else:
+            self.is_distributed = False
             self.with_cuda = False
             self.device = torch.device("cpu")
             torch.manual_seed(self.config['trainer']['seed'])
-        self.logger_info('train with device {} and pytorch {}'.format(self.device, torch.__version__))
+        self.logger_info('train with device {} {} and pytorch {}'.format(self.device,
+                                                                         'distributed' if self.is_distributed is not None and self.is_distributed else 'single',
+                                                                         torch.__version__))
+        self.model.to(self.device)
 
         # metrics and optimizer
         self.metrics = {'recall': 0, 'precision': 0, 'hmean': 0, 'train_loss': float('inf'), 'best_model_epoch': 0}
@@ -72,10 +83,6 @@ class Trainer:
                 self._load_checkpoint(self.net_save_path_best, True)
             else:
                 self.net_save_path_best = ''
-
-        if self.with_cuda and self.is_distributed:
-            self.model = torch.nn.DataParallel(self.model)
-        self.model.to(self.device)
 
         # normalize
         self.UN_Normalize = False
@@ -261,7 +268,24 @@ class Trainer:
             self.logger_info("metrics resume from checkpoint {}".format(checkpoint_path))
             return
 
-        self.model.load_state_dict(checkpoint['state_dict'])
+        state_dict = checkpoint['state_dict']
+        if self.with_cuda:
+            if self.is_distributed:
+                from collections import OrderedDict
+                new_state_dict = OrderedDict()
+                for k, v in state_dict.items():
+                    key = 'module.' + k if not k.startswith('module.') else k
+                    new_state_dict[key] = v
+                self.model.load_state_dict(new_state_dict)
+            else:
+                from collections import OrderedDict
+                new_state_dict = OrderedDict()
+                for k, v in state_dict.items():
+                    key = k[7:] if k.startswith('module.') else k
+                    new_state_dict[key] = v
+                self.model.load_state_dict(new_state_dict)
+        else:
+            self.model.load_state_dict(state_dict)
         self.global_step = checkpoint['global_step']
         self.start_epoch = checkpoint['epoch']
         self.config['lr_scheduler']['args']['last_epoch'] = self.start_epoch
