@@ -189,7 +189,6 @@ class Trainer:
         total_time = 0.0
         for i, batch in tqdm(enumerate(self.validate_loader), total=len(self.validate_loader), desc='test model'):
             with torch.no_grad():
-                # 数据进行转换和丢到gpu
                 for key, value in batch.items():
                     if value is not None:
                         if isinstance(value, torch.Tensor):
